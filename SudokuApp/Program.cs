@@ -5,25 +5,46 @@ using System.Collections.Generic;
 namespace SudokuApp {
     class Program {
         static void Main(string[] args) {
-            Console.WriteLine("Hello World!");
-            SudokuTable t = null, j = null;
+
+            SudokuTable t = null;
             try {
-                //Console.WriteLine(j = new SudokuTable("123456789123456789123456789123456789123456789123456789123456789123456789123456789"));
-                // Console.WriteLine(t = new SudokuTable("a"));
                 Console.WriteLine(t = new SudokuTable("170000006040106000000005208400078000006000005000001300020904500000000000810000649"));
-                t.Solve();
                 Console.WriteLine(t);
+                for (int i = 0; i < 9; i++) {
+                    t.GetRow(i).Print();
+                }
+                t.Solve();
             }
             catch (SudokuException se) {
                 Console.WriteLine(se.Message);
             }
             Console.WriteLine(t == null);
+
+            try {
+                int[,,] matrix = new int[3, 5, 10];
+                for (int i = 0; i < matrix.Rank; i++) {
+                    Console.WriteLine($"matrix rank {i + 1} length: {matrix.GetLength(i)}");
+                }
+                Console.WriteLine(new int[1, 2].Rank);
+            }
+            catch (Exception e) {
+                Console.WriteLine(e.Message);
+            }
+
+            for (int i = 0; i < 9; i++) {
+                t.GetRow(i).Print();
+            }
+            for (int i = 0; i < 10001; i++) {
+                if (MyExtensions.IsPerfectSquare(i)) {
+                    Console.WriteLine($"{i}, sqrt: {Math.Sqrt(i)}");
+                }
+            }
         }
     }
 
     class SudokuTable {
 
-        private int[,] _table;
+        private int[,] _grid;
         List<int> _emptyPositions;
         List<int>[] _possibilitiesByRow;
         List<int>[] _possibilitiesByColumn;
@@ -36,11 +57,21 @@ namespace SudokuApp {
             if (!ValidateTableString(tableString))
                 throw new SudokuException($"Invalid argument for {nameof(tableString)}!");
 
-            _table = ConvertToTable(tableString);
+            _grid = ConvertToTable(tableString);
             _solved = false;
 
             // apagar as linhas abaixo depois
 
+        }
+
+        public int[] GetRow(int index) {
+
+            return _grid.GetRow(index);
+        }
+
+        public int[] GetColumn(int index) {
+
+            return _grid.GetColumn(index);
         }
 
         private bool ValidateTableString(string tableString) {
@@ -75,7 +106,7 @@ namespace SudokuApp {
 
             for (int i = 0; i < 9; i++)
                 for (int j = 0; j < 9; j++)
-                    if (_table[i, j] == 0)
+                    if (_grid[i, j] == 0)
                         _emptyPositions.Add(9 * i + j);
         }
 
@@ -161,7 +192,7 @@ namespace SudokuApp {
         private bool RowContains(int row, int number) {
 
             for (int i = 0; i < 9; i++)
-                if (_table[row, i] == number)
+                if (_grid[row, i] == number)
                     return true;
 
             return false;
@@ -170,7 +201,7 @@ namespace SudokuApp {
         private bool ColumnContains(int column, int number) {
 
             for (int i = 0; i < 9; i++)
-                if (_table[i, column] == number)
+                if (_grid[i, column] == number)
                     return true;
 
             return false;
@@ -196,7 +227,7 @@ namespace SudokuApp {
             int startCol = region % 3 * 3;
 
             for (int i = 0; i < 9; i++) {
-                if (_table[startRow + i / 3, startCol + i % 3] == number)
+                if (_grid[startRow + i / 3, startCol + i % 3] == number)
                     return true;
             }
 
@@ -223,7 +254,7 @@ namespace SudokuApp {
                 row = position / 9;
                 col = position % 9;
                 reg = row / 3 * 3 + col / 3;
-                _table[row, col] = 0;
+                _grid[row, col] = 0;
                 for (j = latest[i]; j < _possibilitiesByPosition[i].Count; j++) {
                     //Console.WriteLine($"[{row},{col}] => trying {latest[i]}: {_possibilitiesByPosition[i][j]}");
                     latest[i]++;
@@ -231,7 +262,7 @@ namespace SudokuApp {
                         !ColumnContains(col, _possibilitiesByPosition[i][j]) &&
                         !RegionContains(reg, _possibilitiesByPosition[i][j])) {
 
-                        _table[row, col] = _possibilitiesByPosition[i][j];
+                        _grid[row, col] = _possibilitiesByPosition[i][j];
                         //Console.WriteLine("  ok!");
                         break;
                     }
@@ -253,9 +284,14 @@ namespace SudokuApp {
             StringBuilder str = new StringBuilder();
 
             for (int i = 0; i < 9; i++) {
-                for (int j = 0; j < 8; j++)
-                    str.Append(_table[i, j] + ",");
-                str.Append(_table[i, 8] + "\n");
+                for (int j = 0; j < 9; j++) {
+                    str.Append((_grid[i, j] > 0 ? _grid[i, j].ToString() : "-") + "  ");
+                    if ((j + 1) % 3 == 0 && j < 8)
+                        str.Append("| ");
+                }
+                str.Append("\n");
+                if ((i + 1) % 3 == 0 && i < 8)
+                    str.Append("\n");
             }
 
             return $"{str}";
