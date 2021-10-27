@@ -1,64 +1,44 @@
 ﻿using System;
 using System.Text;
+using System.Linq;
 using System.Collections.Generic;
+using MyLibrary1;
 
 namespace SudokuApp {
     class Program {
         static void Main(string[] args) {
 
+            Prog();
+        }
+
+        static void Prog() {
             SudokuTable t = null;
             try {
                 Console.WriteLine(t = new SudokuTable("170000006040106000000005208400078000006000005000001300020904500000000000810000649"));
-                Console.WriteLine(t);
                 for (int i = 0; i < 9; i++) {
-                    t.GetRow(i).Print();
+                    MyConsole.PrintArray(t.GetRow(i));
                 }
                 t.Solve();
-            }
-            catch (SudokuException se) {
-                Console.WriteLine(se.Message);
-            }
-            Console.WriteLine(t == null);
-
-            try {
-                int[,,] matrix = new int[3, 5, 10];
-                for (int i = 0; i < matrix.Rank; i++) {
-                    Console.WriteLine($"matrix rank {i + 1} length: {matrix.GetLength(i)}");
-                }
-                Console.WriteLine(new int[1, 2].Rank);
+                Console.WriteLine(t);
             }
             catch (Exception e) {
                 Console.WriteLine(e.Message);
-            }
-
-            for (int i = 0; i < 9; i++) {
-                t.GetRow(i).Print();
-            }
-            for (int i = 0; i < 10001; i++) {
-                if (MyExtensions.IsPerfectSquare(i)) {
-                    Console.WriteLine($"{i}, sqrt: {Math.Sqrt(i)}");
-                }
             }
         }
     }
 
     class SudokuTable {
 
-        private int[,] _grid;
-        List<int> _emptyPositions;
-        List<int>[] _possibilitiesByRow;
-        List<int>[] _possibilitiesByColumn;
-        List<int>[] _possibilitiesByRegion;
-        List<int>[] _possibilitiesByPosition;
-        bool _solved;
+        private int[,] _matrix;
+        private List<int> _emptyPositions;
+        private List<int>[] _possibilitiesByPosition;
 
         public SudokuTable(string tableString) {
 
             if (!ValidateTableString(tableString))
                 throw new SudokuException($"Invalid argument for {nameof(tableString)}!");
 
-            _grid = ConvertToTable(tableString);
-            _solved = false;
+            _matrix = ConvertToTable(tableString);
 
             // apagar as linhas abaixo depois
 
@@ -66,12 +46,17 @@ namespace SudokuApp {
 
         public int[] GetRow(int index) {
 
-            return _grid.GetRow(index);
+            return _matrix.GetRow(index);
         }
 
         public int[] GetColumn(int index) {
 
-            return _grid.GetColumn(index);
+            return _matrix.GetColumn(index);
+        }
+
+        public int[] GetSquare(int index) {
+
+            return _matrix.GetSquare(index);
         }
 
         private bool ValidateTableString(string tableString) {
@@ -106,170 +91,64 @@ namespace SudokuApp {
 
             for (int i = 0; i < 9; i++)
                 for (int j = 0; j < 9; j++)
-                    if (_grid[i, j] == 0)
+                    if (_matrix[i, j] == 0)
                         _emptyPositions.Add(9 * i + j);
-        }
-
-        private void MapPossibilitiesByRow() {
-
-            _possibilitiesByRow = new List<int>[9];
-
-            for (int i = 0; i < 9; i++) {
-                _possibilitiesByRow[i] = new List<int>(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-                int count = 0;
-                while (count < _possibilitiesByRow[i].Count) {
-                    if (RowContains(i, _possibilitiesByRow[i][count]))
-                        _possibilitiesByRow[i].RemoveAt(count);
-                    else
-                        count++;
-                }
-            }
-        }
-
-        private void MapPossibilitiesByColumn() {
-
-            _possibilitiesByColumn = new List<int>[9];
-
-            for (int i = 0; i < 9; i++) {
-                _possibilitiesByColumn[i] = new List<int>(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-                int count = 0;
-                while (count < _possibilitiesByColumn[i].Count) {
-                    if (ColumnContains(i, _possibilitiesByColumn[i][count]))
-                        _possibilitiesByColumn[i].RemoveAt(count);
-                    else
-                        count++;
-                }
-            }
-        }
-
-        private void MapPossibilitiesByRegion() {
-
-            _possibilitiesByRegion = new List<int>[9];
-
-            for (int i = 0; i < 9; i++) {
-                TestRegion(i);
-                _possibilitiesByRegion[i] = new List<int>(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
-                int count = 0;
-                while (count < _possibilitiesByRegion[i].Count) {
-                    if (RegionContains(i, _possibilitiesByRegion[i][count]))
-                        _possibilitiesByRegion[i].RemoveAt(count);
-                    else
-                        count++;
-                }
-            }
         }
 
         private void MapPossibilitiesByPosition() {
 
-            int empty = _emptyPositions.Count;
-            _possibilitiesByPosition = new List<int>[empty];
+            _possibilitiesByPosition = new List<int>[_emptyPositions.Count];
 
-            int row;
-            int col;
-            int reg;
-
-            for (int i = 0; i < empty; i++) {
-                _possibilitiesByPosition[i] = new List<int>(new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+            for (int i = 0; i < _emptyPositions.Count; i++) {
+                _possibilitiesByPosition[i] = new List<int>(MyArray.BuildOrdered(9, 1));
                 int position = _emptyPositions[i];
-                row = position / 9;
-                col = position % 9;
-                reg = row / 3 * 3 + col / 3;
+                int rowIndex = position / 9;
+                int colIndex = position % 9;
+                int sqrIndex = rowIndex / 3 * 3 + colIndex / 3;
+                int[] row = _matrix.GetRow(rowIndex);
+                int[] col = _matrix.GetColumn(colIndex);
+                int[] sqr = _matrix.GetSquare(sqrIndex);
                 int count = 0;
                 while (count < _possibilitiesByPosition[i].Count) {
                     int value = _possibilitiesByPosition[i][count];
-                    if (_possibilitiesByRow[row].Contains(value) &&
-                        _possibilitiesByColumn[col].Contains(value) &&
-                        _possibilitiesByRegion[reg].Contains(value)) {
-
-                        count++;
-                    }
-                    else
+                    if (row.Contains(value) || col.Contains(value) || sqr.Contains(value))
                         _possibilitiesByPosition[i].RemoveAt(count);
+                    else
+                        count++;
                 }
             }
         }
 
-        private bool RowContains(int row, int number) {
-
-            for (int i = 0; i < 9; i++)
-                if (_grid[row, i] == number)
-                    return true;
-
-            return false;
-        }
-
-        private bool ColumnContains(int column, int number) {
-
-            for (int i = 0; i < 9; i++)
-                if (_grid[i, column] == number)
-                    return true;
-
-            return false;
-        }
-
-        private void TestRegion(int region) {
-
-            int startRow = region / 3 * 3;
-            int startCol = region % 3 * 3;
-
-            Console.WriteLine($"Region {region}:\n");
-
-            for (int i = 0; i < 9; i++) {
-                Console.Write($"  [{startRow + i / 3},{startCol + i % 3}] ");
-                if ((i + 1) % 3 == 0)
-                    Console.WriteLine();
-            }
-        }
-
-        private bool RegionContains(int region, int number) {
-
-            int startRow = region / 3 * 3;
-            int startCol = region % 3 * 3;
-
-            for (int i = 0; i < 9; i++) {
-                if (_grid[startRow + i / 3, startCol + i % 3] == number)
-                    return true;
-            }
-
-            return false;
-        }
-
         public void Solve() {
             MapEmptyPositions();
-            MapPossibilitiesByRow();
-            MapPossibilitiesByColumn();
-            MapPossibilitiesByRegion();
             MapPossibilitiesByPosition();
 
-            int row;
-            int col;
-            int reg;
-            int position;
-            int j;
-
-            int[] latest = new int[_emptyPositions.Count];
+            int[] next = new int[_emptyPositions.Count];
 
             for (int i = 0; i < _emptyPositions.Count; i++) {
-                position = _emptyPositions[i];
-                row = position / 9;
-                col = position % 9;
-                reg = row / 3 * 3 + col / 3;
-                _grid[row, col] = 0;
-                for (j = latest[i]; j < _possibilitiesByPosition[i].Count; j++) {
+                int position = _emptyPositions[i];
+                int rowIndex = position / 9;
+                int colIndex = position % 9;
+                int sqrIndex = rowIndex / 3 * 3 + colIndex / 3;
+                int j;
+                int[] row = _matrix.GetRow(rowIndex);
+                int[] col = _matrix.GetColumn(colIndex);
+                int[] sqr = _matrix.GetSquare(sqrIndex);
+                for (j = next[i]; j < _possibilitiesByPosition[i].Count; j++) {
                     //Console.WriteLine($"[{row},{col}] => trying {latest[i]}: {_possibilitiesByPosition[i][j]}");
-                    latest[i]++;
-                    if (!RowContains(row, _possibilitiesByPosition[i][j]) &&
-                        !ColumnContains(col, _possibilitiesByPosition[i][j]) &&
-                        !RegionContains(reg, _possibilitiesByPosition[i][j])) {
+                    next[i]++;
+                    int value = _possibilitiesByPosition[i][j];
+                    if (!row.Contains(value) && !col.Contains(value) && !sqr.Contains(value)) {
 
-                        _grid[row, col] = _possibilitiesByPosition[i][j];
+                        _matrix[rowIndex, colIndex] = _possibilitiesByPosition[i][j];
                         //Console.WriteLine("  ok!");
                         break;
                     }
                 }
                 if (j == _possibilitiesByPosition[i].Count) {
                     if (i > 0) {
-                        latest[i] = 0;
+                        _matrix[rowIndex, colIndex] = 0;
+                        next[i] = 0;
                         i -= 2;
                         //Console.WriteLine("  No more possibilities...");
                     }
@@ -285,7 +164,7 @@ namespace SudokuApp {
 
             for (int i = 0; i < 9; i++) {
                 for (int j = 0; j < 9; j++) {
-                    str.Append((_grid[i, j] > 0 ? _grid[i, j].ToString() : "-") + "  ");
+                    str.Append((_matrix[i, j] > 0 ? _matrix[i, j].ToString() : "-") + "  ");
                     if ((j + 1) % 3 == 0 && j < 8)
                         str.Append("| ");
                 }
